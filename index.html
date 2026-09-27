@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Codex 免验证码登录 · Session Auth</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-2: #1b1f26;
+    --border: #262b33;
+    --text: #e6e8eb;
+    --muted: #8b95a3;
+    --accent: #10a37f;
+    --accent-hover: #13bb91;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --code-bg: #0f1216;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  header h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .step {
+    margin-top: 32px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .step-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .step-desc {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 14px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: var(--panel-2); }
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 12px;
+    background: var(--code-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs-spacer { flex: 1; }
+  .tab {
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: inherit;
+  }
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .tab:hover { color: var(--text); }
+  .code-box {
+    position: relative;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .code-box pre {
+    margin: 0;
+    padding: 14px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: #d4d8de;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 380px;
+  }
+  .copy-btn {
+    padding: 5px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    margin-bottom: 6px;
+    align-self: center;
+  }
+  .copy-btn:hover { color: var(--text); }
+  .copy-btn.ok { color: var(--accent); border-color: var(--accent); }
+  .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .hint {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 8px;
+    color: #fcd9a3;
+    font-size: 12.5px;
+  }
+  .err {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 12.5px;
+    display: none;
+  }
+  .err.show { display: block; }
+  /* === Password Gate === */
+  body.gated .wrap {
+    filter: blur(6px);
+    pointer-events: none;
+    user-select: none;
+  }
+  .gate-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 13, 16, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gate-overlay.hidden { display: none; }
+  .gate-box {
+    max-width: 420px;
+    width: 100%;
+    padding: 40px 32px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    text-align: center;
+  }
+  .gate-box h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    letter-spacing: -0.3px;
+  }
+  .gate-box .gate-sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+  .gate-qr {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--panel-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gate-qr img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gate-qr .qr-placeholder {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 16px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .gate-hint {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 20px;
+    line-height: 1.6;
+  }
+  .gate-hint strong { color: var(--accent); }
+  .gate-getpwd {
+    display: inline-block;
+    margin: 12px 0 4px;
+    padding: 8px 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: inherit;
+  }
+  .gate-getpwd:hover { background: var(--accent-hover); }
+  .gate-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .gate-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--code-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .gate-input:focus { border-color: var(--accent); }
+  .gate-input::placeholder { color: #555; }
+  .gate-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .gate-btn:hover { background: var(--accent-hover); }
+  .gate-err {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 12.5px;
+    display: none;
+  }
+  .gate-err.show { display: block; }
+  .gate-section { display: none; }
+  .gate-section.active { display: block; }
+  .gate-back {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .gate-back:hover { color: var(--text); border-color: var(--text); }
+  /* === end gate === */
+
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 20px;
+    text-align: center;
+  }
+  code.inline {
+    background: var(--panel-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  footer a { color: var(--muted); }
+  .links-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+  }
+  .links-row .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .links-row .btn-ghost:hover {
+    background: var(--panel-2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<!-- Password Gate Overlay -->
+<div class="gate-overlay" id="gate">
+  <div class="gate-box">
+    <h2>🔐 访问验证</h2>
+
+    <!-- Section 1: 密码输入（默认显示） -->
+    <div class="gate-section active" id="gateInput">
+      <p class="gate-sub">请输入密码以访问</p>
+      <div class="gate-input-row">
+        <input class="gate-input" id="pwdInput" type="password" placeholder="请输入密码" autocomplete="off">
+        <button class="gate-btn" id="pwdBtn">验证</button>
+      </div>
+      <div class="gate-err" id="pwdErr"></div>
+      <button class="gate-getpwd" id="getPwdBtn">👉 点此获取密码</button>
+    </div>
+
+    <!-- Section 2: 获取密码（点击后显示） -->
+    <div class="gate-section" id="gateQr">
+      <div class="gate-qr">
+        <img id="qrImg" src="qrcode.webp" alt="公众号二维码"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+        <div class="qr-placeholder" style="display:none">
+          📱<br>请将公众号二维码<br>放到网站根目录<br>命名为 <code class="inline">qrcode.webp</code>
+        </div>
+      </div>
+      <p class="gate-hint">
+        1. 扫描上方二维码，关注公众号<br>
+        2. 回复关键词 <strong>密码</strong><br>
+        3. 将收到的密码粘贴到下方输入框
+      </p>
+      <button class="gate-back" id="backToInput">← 返回输入密码</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header>
+    <h1>Codex 免验证码登录</h1>
+    <p>纯前端工具 · 通过 ChatGPT Session Token 配置 Codex CLI</p>
+  </header>
+
+  <!-- Step 1 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <span class="step-title">获取 Session Token</span>
+    </div>
+    <p class="step-desc">
+      请先在浏览器登录 ChatGPT,然后点击下方按钮打开 Session 接口,复制返回的整段 JSON。
+    </p>
+    <div class="row">
+      <a class="btn" href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener">
+        打开 Session 接口 ↗
+      </a>
+    </div>
+    <div class="hint">
+      接口返回形如 <code class="inline">{"user":{...},"accessToken":"eyJ...","expires":"..."}</code>。
+      整段复制粘贴即可,也可以只粘 <code class="inline">accessToken</code> 的值。
+    </div>
+  </section>
+
+  <!-- Step 2 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <span class="step-title">粘贴 Session JSON 或 Access Token</span>
+    </div>
+    <textarea id="input" placeholder='粘贴整段 JSON,例如:&#10;{&#10;  "user": {...},&#10;  "accessToken": "eyJhbGciOiJSUzI1NiIs...",&#10;  "expires": "2026-...",&#10;  ...&#10;}&#10;&#10;或仅粘贴 accessToken 字符串。'></textarea>
+    <div class="err" id="err"></div>
+  </section>
+
+  <!-- Step 3 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <span class="step-title">生成命令并执行</span>
+    </div>
+    <p class="step-desc">
+      将下方命令复制到对应系统的终端执行,会在 <code class="inline">~/.codex/auth.json</code> 写入凭证。
+    </p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="powershell">Windows PowerShell</button>
+      <button class="tab" data-tab="linux">Linux Bash</button>
+      <button class="tab" data-tab="macos">macOS Bash</button>
+      <span class="tabs-spacer"></span>
+      <button class="copy-btn" id="copyBtn">复制</button>
+    </div>
+
+    <div class="code-box">
+      <pre id="output"><span class="empty" style="display:block">先在上方粘贴 token,命令会自动生成</span></pre>
+    </div>
+  </section>
+
+  <div class="links-row">
+    <a class="btn-ghost" href="https://chatgpt.com" target="_blank" rel="noopener">🌐 ChatGPT 官网</a>
+    <a class="btn-ghost" href="https://chatgpt.com/advanced-account-security" target="_blank" rel="noopener">⚙️ 高级账户设置</a>
+    <a class="btn-ghost" href="https://github.com/kyjl97" target="_blank" rel="noopener">💻 GitHub 主页</a>
+  </div>
+
+  <footer>
+    所有处理均在浏览器本地完成,不会上传任何数据。
+  </footer>
+</div>
+
+<script>
+// ===== Password Gate =====
+// ⚠️ 请修改下面的值：
+// HASHED_PWD — 你的密码的 SHA-256 哈希值
+// 如何生成哈希：在浏览器控制台运行 sha256('你的密码')，或访问 https://emn178.github.io/online-tools/sha256.html
+// 示例密码 "codex2026" 的哈希: 3e69039eb2718d5b0706ead298a5d85873eb5af6d16dbb8d7205daf27502a91b
+const HASHED_PWD = '3e69039eb2718d5b0706ead298a5d85873eb5af6d16dbb8d7205daf27502a91b'; // 示例密码: codex2026。请修改为你自己的密码哈希
+
+async function sha256(msg) {
+  const buffer = new TextEncoder().encode(msg);
+  const hash = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyPassword() {
+  const input = document.getElementById('pwdInput');
+  const errEl = document.getElementById('pwdErr');
+  const val = input.value.trim();
+  if (!val) {
+    errEl.textContent = '请输入密码';
+    errEl.classList.add('show');
+    return;
+  }
+  const hash = await sha256(val);
+  if (hash === HASHED_PWD) {
+    localStorage.setItem('auth_ok', '1');
+    document.getElementById('gate').classList.add('hidden');
+    document.body.classList.remove('gated');
+  } else {
+    errEl.textContent = '密码错误，请重新输入';
+    errEl.classList.add('show');
+    input.value = '';
+    input.focus();
+  }
+}
+
+document.getElementById('pwdBtn').addEventListener('click', verifyPassword);
+document.getElementById('pwdInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') verifyPassword();
+});
+
+// 切换到"获取密码"区域
+document.getElementById('getPwdBtn').addEventListener('click', function() {
+  document.getElementById('gateInput').classList.remove('active');
+  document.getElementById('gateQr').classList.add('active');
+  document.getElementById('pwdErr').classList.remove('show');
+});
+// 切回密码输入区域
+document.getElementById('backToInput').addEventListener('click', function() {
+  document.getElementById('gateQr').classList.remove('active');
+  document.getElementById('gateInput').classList.add('active');
+});
+
+// 检查是否已验证
+if (localStorage.getItem('auth_ok') === '1') {
+  document.getElementById('gate').classList.add('hidden');
+} else {
+  document.body.classList.add('gated');
+}
+
+// ===== Main App =====
+(function () {
+  const input = document.getElementById('input');
+  const output = document.getElementById('output');
+  const err = document.getElementById('err');
+  const copyBtn = document.getElementById('copyBtn');
+  const tabs = document.querySelectorAll('.tab');
+
+  let currentPlatform = 'powershell';
+  let currentCommand = '';
+
+  function showErr(msg) {
+    err.textContent = msg;
+    err.classList.add('show');
+  }
+  function clearErr() {
+    err.textContent = '';
+    err.classList.remove('show');
+  }
+
+  // Base64URL decode (for JWT)
+  function b64urlDecode(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) str += '=';
+    try {
+      return decodeURIComponent(
+        atob(str).split('').map(c =>
+          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        ).join('')
+      );
+    } catch (e) {
+      return atob(str);
+    }
+  }
+
+  function parseJWT(token) {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      return JSON.parse(b64urlDecode(parts[1]));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function extractToken(raw) {
+    const text = raw.trim();
+    if (!text) return null;
+
+    // 尝试解析 JSON
+    if (text.startsWith('{')) {
+      try {
+        const obj = JSON.parse(text);
+        if (typeof obj.accessToken === 'string') return obj.accessToken;
+        if (obj.tokens && typeof obj.tokens.access_token === 'string') return obj.tokens.access_token;
+        if (typeof obj.access_token === 'string') return obj.access_token;
+        throw new Error('JSON 中未找到 accessToken 字段');
+      } catch (e) {
+        throw new Error('JSON 解析失败: ' + e.message);
+      }
+    }
+
+    // 当作纯 token 字符串
+    if (text.split('.').length === 3) return text;
+    throw new Error('无法识别的输入。请粘贴 Session JSON 或 JWT 字符串。');
+  }
+
+  function buildAuthJson(accessToken) {
+    const payload = parseJWT(accessToken) || {};
+    const authClaim = payload['https://api.openai.com/auth'] || {};
+    const accountId = authClaim.chatgpt_account_id || authClaim.user_id || '';
+
+    return {
+      auth_mode: 'chatgpt',
+      OPENAI_API_KEY: null,
+      tokens: {
+        id_token: accessToken,
+        access_token: accessToken,
+        refresh_token: '',
+        account_id: accountId
+      },
+      last_refresh: new Date().toISOString()
+    };
+  }
+
+  function genPowerShell(authObj) {
+    const json = JSON.stringify(authObj, null, 2);
+    return `# Codex 凭证写入 (Windows PowerShell · 兼容 5.1 / 7+)
+$dir = Join-Path $HOME ".codex"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$json = @'
+${json}
+'@
+# 用 .NET API 强制写入无 BOM 的 UTF-8(PS 5.1 的 -Encoding UTF8 会带 BOM,导致 codex 报 "expected value at line 1 column 1")
+[System.IO.File]::WriteAllText((Join-Path $dir "auth.json"), $json, (New-Object System.Text.UTF8Encoding $false))`;
+  }
+
+  function genBash(authObj, comment) {
+    const json = JSON.stringify(authObj, null, 2);
+    return `# ${comment}
+mkdir -p ~/.codex
+cat > ~/.codex/auth.json <<'EOF'
+${json}
+EOF
+echo "[OK] 已写入 ~/.codex/auth.json"`;
+  }
+
+  function render() {
+    clearErr();
+    const raw = input.value;
+    if (!raw.trim()) {
+      output.innerHTML = '<span class="empty" style="display:block">先在上方粘贴 token,命令会自动生成</span>';
+      currentCommand = '';
+      return;
+    }
+
+    let token;
+    try {
+      token = extractToken(raw);
+    } catch (e) {
+      showErr(e.message);
+      output.innerHTML = '<span class="empty" style="display:block">解析失败,请检查输入</span>';
+      currentCommand = '';
+      return;
+    }
+
+    if (!token) {
+      output.innerHTML = '<span class="empty" style="display:block">未找到 token</span>';
+      currentCommand = '';
+      return;
+    }
+
+    const authObj = buildAuthJson(token);
+
+    let cmd;
+    if (currentPlatform === 'powershell') cmd = genPowerShell(authObj);
+    else if (currentPlatform === 'linux') cmd = genBash(authObj, 'Codex 凭证写入 (Linux Bash)');
+    else cmd = genBash(authObj, 'Codex 凭证写入 (macOS Bash)');
+
+    currentCommand = cmd;
+    output.textContent = cmd;
+  }
+
+  input.addEventListener('input', render);
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentPlatform = tab.dataset.tab;
+      render();
+    });
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    if (!currentCommand) return;
+    try {
+      await navigator.clipboard.writeText(currentCommand);
+      copyBtn.textContent = '已复制';
+      copyBtn.classList.add('ok');
+      setTimeout(() => {
+        copyBtn.textContent = '复制';
+        copyBtn.classList.remove('ok');
+      }, 1500);
+    } catch (e) {
+      // fallback
+      const range = document.createRange();
+      range.selectNodeContents(output);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      copyBtn.textContent = '已复制';
+      setTimeout(() => { copyBtn.textContent = '复制'; }, 1500);
+    }
+  });
+})();
+</script>
+</body>
+</html>
